@@ -1,0 +1,6 @@
+Domain1 zixstyle.my.id
+Domain2 vpnmurah.me
+Domain3 autoscript.ninja
+Domain4 vpnmurah.biz.id
+
+Jumlah 4
