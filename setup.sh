@@ -52,101 +52,65 @@ export Server_IP="underfined"
 export Script_Mode="Stable"
 export Auther=".geovpn"
 
-# // Exporting Script Version
-export VERSION="1.1"
- 
-# // Exporint IP AddressInformation
+# // Root Checking
+if [ "${EUID}" -ne 0 ]; then
+		echo -e "${EROR} Please Run This Script As Root User !"
+		exit 1
+fi
+
+# // Exporting IP Address
 export IP=$( curl -s https://ipinfo.io/ip/ )
 
-# // License Validating
-echo ""
-read -p "Input Your License Key : " Input_License_Key
+# // Exporting Network Interface
+export NETWORK_IFACE="$(ip route show to default | awk '{print $5}')"
 
-# // Checking Input Blank
-if [[ $Input_License_Key ==  "" ]]; then
-    echo -e "${EROR} Please Input License Key !${NC}"
-    exit 1
-fi
-
-# // Checking License Validate
-Key="$Input_License_Key"
-
-# // Set Time To Jakarta / GMT +7
-ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
-
-# // Algoritma Key
-algoritmakeys="1920192019209129403940293013912" 
-hashsuccess="$(echo -n "$Key" | sha256sum | cut -d ' ' -f 1)" 
-Sha256Successs="$(echo -n "$hashsuccess$algoritmakeys" | sha256sum | cut -d ' ' -f 1)" 
-License_Key=$Sha256Successs
-echo ""
-echo -e "${OKEY} Successfull Connected To Server"
-sleep 1
-
-# // Validate Result
-Getting_Data_On_Server=$( curl -s https://${Server_URL}/validated-registered-license-key.txt | grep $License_Key | cut -d ' ' -f 1 )
-if [[ "$Getting_Data_On_Server" == "$License_Key" ]]; then
-    mkdir -p /etc/${Auther}/
-    echo "$License_Key" > /etc/${Auther}/license.key
-    echo -e "${OKEY} License Validated !"
-    sleep 1
+# // Validate Result ( 1 )
+touch /etc/${Auther}/license.key
+export Your_License_Key="$( cat /etc/${Auther}/license.key | awk '{print $1}' )"
+export Validated_Your_License_Key_With_Server="$( curl -s https://${Server_URL}/validated-registered-license-key.txt | grep -w $Your_License_Key | head -n1 | cut -d ' ' -f 1 )"
+if [[ "$Validated_Your_License_Key_With_Server" == "$Your_License_Key" ]]; then
+    validated='true'
 else
-    echo -e "${EROR} Your License Key Not Valid !"
+    echo -e "${EROR} License Key Not Valid"
     exit 1
 fi
-# // Checking Your VPS Blocked Or No
-if [[ $IP == "" ]]; then
-    echo -e "${EROR} Your IP Address Not Detected !"
-    exit 1
+
+# // Checking VPS Status > Got Banned / No
+if [[ $IP == "$( curl -s https://${Server_URL}/blacklist.txt | cut -d ' ' -f 1 | grep -w $IP | head -n1 )" ]]; then
+    echo -e "${EROR} 403 Forbidden ( Your VPS Has Been Banned )"
+    exit  1
+fi
+
+# // Checking VPS Status > Got Banned / No
+if [[ $Your_License_Key == "$( curl -s https://${Server_URL} | cut -d ' ' -f 1 | grep -w $Your_License_Key | head -n1)" ]]; then
+    echo -e "${EROR} 403 Forbidden ( Your License Has Been Limited )"
+    exit  1
+fi
+
+# // Checking VPS Status > Got Banned / No
+if [[ 'Standart' == "$( curl -s https://${Server_URL}/validated-registered-license-key.txt | grep -w $Your_License_Key | head -n1 | cut -d ' ' -f 6 )" ]]; then 
+    License_Mode='Standart'
+elif [[ Pro == "$( curl -s https://${Server_URL}/validated-registered-license-key.txt | grep -w $Your_License_Key | head -n1 | cut -d ' ' -f 6 )" ]]; then 
+    License_Mode='Pro'
 else
-    # // Checking Data
-    export Check_Blacklist_Atau_Tidak=$( curl -s https://${Server_URL}/blacklist.txt | grep -w $License_Key | awk '{print $1}' | tr -d '\r' | tr -d '\r\n' | head -n1 )
-    if [[ $Check_Blacklist_Atau_Tidak == $IP ]]; then
-        echo -e "${EROR} 403 Forbidden ( Your VPS Has Been Blocked ) !"
-        exit 1
-    else
-        Skip='true'
-    fi
+    echo -e "${EROR} Please Using Genuine License !"
+    exit 1
 fi
-# // cek limit
-export limit=$( curl -s https://${Server1_URL}/limit.txt | grep $License_Key | wc -l )
-export Install_Limited=$( curl -s https://${Server_URL}/validated-registered-license-key.txt | grep -w $License_Key | cut -d ' ' -f 2)
-if [[ $limit == $Install_Limited ]]; then
-        echo -e "${EROR} 403 Forbidden ( Your License Max Limit Install ) !"
-        exit 1
-    else
-        Skip='true'
-fi
-# // License Key Detail
-export Tanggal_Pembelian_License=`date +"%Y-%m-%d" -d "$dateFromServer"`
-export Nama_Issued_License=$( curl -s https://${Server_URL}/validated-registered-license-key.txt | grep -w $License_Key | cut -d ' ' -f 7| tr -d '\r' | tr -d '\r\n')
-export mekmek=$( curl -s https://${Server_URL}/validated-registered-license-key.txt | grep -w $License_Key | cut -d ' ' -f 3 | tr -d '\r' | tr -d '\r\n')
-export Masa_Laku_License_Berlaku_Sampai=`date -d "$mekmek days" +"%Y-%m-%d"`
-export Install_Limit=$( curl -s https://${Server_URL}/validated-registered-license-key.txt | grep -w $License_Key | cut -d ' ' -f 2 | tr -d '\r' | tr -d '\r\n')
-export Tipe_License=$( curl -s https://${Server_URL}/validated-registered-license-key.txt | grep -w $License_Key | cut -d ' ' -f 8 | tr -d '\r' | tr -d '\r\n')
 
-# // Ouputing Information
-echo -e "${OKEY} License Type / Edition ( ${GREEN}$Tipe_License Edition${NC} )" # > // Output Tipe License Dari Exporting
-echo -e "${OKEY} This License Issued to (${GREEN} $Nama_Issued_License ${NC})"
-echo -e "${OKEY} Subscription Started On (${GREEN} $Tanggal_Pembelian_License${NC} )"
-echo -e "${OKEY} Subscription Ended On ( ${GREEN}${Masa_Laku_License_Berlaku_Sampai}${NC} )"
-echo -e "${OKEY} Installation Limit ( ${GREEN}$Install_Limit VPS${NC} )"
-echo -e "${OKEY} Installation Usage ( ${GREEN}$limit VPS${NC} )"
-
-# // Exporting Expired Date
-export Tanggal_Sekarang=`date -d "0 days" +"%Y-%m-%d"`
-export Masa_Aktif_Dalam_Satuan_Detik=$(date -d "$Masa_Laku_License_Berlaku_Sampai" +%s)
-export Tanggal_Sekarang_Dalam_Satuan_Detik=$(date -d "$Tanggal_Sekarang" +%s)
-export Hasil_Pengurangan_Dari_Masa_Aktif_Dan_Hari_Ini_Dalam_Satuan_Detik=$(( (Masa_Aktif_Dalam_Satuan_Detik - Tanggal_Sekarang_Dalam_Satuan_Detik) / 86400 ))
-if [[ $Hasil_Pengurangan_Dari_Masa_Aktif_Dan_Hari_Ini_Dalam_Satuan_Detik -lt 0 ]]; then
-    echo -e "${EROR} Your License Expired On ( ${RED}$Masa_Laku_License_Berlaku_Sampai${NC} )"
+# // Checking Script Expired
+exp=$( curl -s https://${Server1_URL}/limit.txt | grep -w $IP | cut -d ' ' -f 3 )
+now=`date -d "0 days" +"%Y-%m-%d"`
+expired_date=$(date -d "$exp" +%s)
+now_date=$(date -d "$now" +%s)
+sisa_hari=$(( ($expired_date - $now_date) / 86400 ))
+if [[ $sisa_hari -lt 0 ]]; then
+    echo $sisa_hari > /etc/${Auther}/license-remaining-active-days.db
+    echo -e "${EROR} Your License Key Expired ( $sisa_hari Days )"
     exit 1
 else
-    echo -e "${OKEY} Your License Key = $(if [[ ${Hasil_Pengurangan_Dari_Masa_Aktif_Dan_Hari_Ini_Dalam_Satuan_Detik} -lt 5 ]]; then
-    echo -e "${RED}${Hasil_Pengurangan_Dari_Masa_Aktif_Dan_Hari_Ini_Dalam_Satuan_Detik}${NC} Days Left"; else
-    echo -e "${GREEN}${Hasil_Pengurangan_Dari_Masa_Aktif_Dan_Hari_Ini_Dalam_Satuan_Detik}${NC} Days Left"; fi )"
+    echo $sisa_hari > /etc/${Auther}/license-remaining-active-days.db
 fi
-
+clear
 # // Validate Successfull
 echo ""
 read -p "$( echo -e "Press ${CYAN}[ ${NC}${GREEN}Enter${NC} ${CYAN}]${NC} For Starting Installation") "
